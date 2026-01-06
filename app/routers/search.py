@@ -169,27 +169,53 @@ async def fetch_verses(
     
     for trans in translations:
         # Map translation codes to table names
+        # Some translations are in bible_books, others have separate tables
+        trans_lower = trans.lower()
         table_map = {
-            'cuvs': 'bible_books',
-            'cuvt': 'bible_books',
-            'kjv': 'bible_books',
-            'nasb': 'bible_books',
-            'esv': 'bible_books'
+            'cuvs': 'bible_books',      # Uses txt_cn column
+            'cuvt': 'bible_books',      # Uses txt_tw column
+            'kjv': 'bible_book_kjv',    # Separate table (or bible_books txt_en)
+            'nasb': 'bible_book_nasb',  # Separate table
+            'esv': 'bible_book_esv',    # Separate table
+            'pinyin': 'bible_books'      # Uses txt_py column
         }
         
-        table = table_map.get(trans.lower(), 'bible_books')
+        table = table_map.get(trans_lower, f'bible_book_{trans_lower}')
         
         # Build query (table name is from whitelist, so safe)
-        # Note: asyncpg doesn't support parameterized table names, so we validate against whitelist
-        query = f"""
-            SELECT book, chapter, verse, txt, likes
-            FROM {table}
-            WHERE book = $1
-            AND chapter = $2
-            AND verse >= $3
-            AND verse <= $4
-            ORDER BY verse
-        """
+        # Note: MySQL uses %s for parameter placeholders
+        # For translation-specific tables, use the translation table
+        # For bible_books, we need to select the appropriate txt column
+        
+        if table == 'bible_books':
+            # Main table has multiple txt columns
+            txt_column_map = {
+                'cuvs': 'txt_cn',
+                'cuvt': 'txt_tw',
+                'kjv': 'txt_en',   # KJV in main table uses txt_en
+                'pinyin': 'txt_py'
+            }
+            txt_column = txt_column_map.get(trans_lower, 'txt_cn')
+            query = f"""
+                SELECT book, chapter, verse, {txt_column} as txt, likes
+                FROM {table}
+                WHERE book = %s
+                AND chapter = %s
+                AND verse >= %s
+                AND verse <= %s
+                ORDER BY verse
+            """
+        else:
+            # Translation-specific table
+            query = f"""
+                SELECT Book as book, Chapter as chapter, Verse as verse, Scripture as txt
+                FROM {table}
+                WHERE Book = %s
+                AND Chapter = %s
+                AND Verse >= %s
+                AND Verse <= %s
+                ORDER BY Verse
+            """
         
         rows = await db.fetch_all(query, book_id, chapter, verse_min, verse_max)
         
@@ -199,7 +225,7 @@ async def fetch_verses(
             
             # Process text
             text = process_bible_text(
-                text=row['txt'],
+                text=row.get('txt', ''),
                 queries=None,  # No highlighting for reference searches
                 strongs=strongs
             )
@@ -243,27 +269,26 @@ async def search_by_keywords(
     # Build WHERE clause for keyword matching
     conditions = []
     params = []
-    param_idx = 1
     
     for keyword in keywords:
-        conditions.append(f"txt ILIKE ${param_idx}")
+        conditions.append("txt LIKE %s")
         params.append(f"%{keyword}%")
-        param_idx += 1
     
     where_clause = " AND ".join(conditions)
     
     # Add book filter if specified
     if book_filter:
-        where_clause = f"book = ${param_idx} AND {where_clause}"
-        params.append(book_filter)
-        param_idx += 1
+        where_clause = f"book = %s AND {where_clause}"
+        params.insert(0, book_filter)
     
     # Build query with parameterized conditions
+    # Note: bible_search doesn't have likes column, so we'll join with bible_books if needed
     query = f"""
-        SELECT DISTINCT book, chapter, verse, txt, likes
-        FROM bible_search
+        SELECT DISTINCT s.book, s.chapter, s.verse, s.txt, COALESCE(b.likes, 0) as likes
+        FROM bible_search s
+        LEFT JOIN bible_books b ON s.book = b.book AND s.chapter = b.chapter AND s.verse = b.verse
         WHERE {where_clause}
-        ORDER BY book, chapter, verse
+        ORDER BY s.book, s.chapter, s.verse
         LIMIT 100
     """
     

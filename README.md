@@ -2,7 +2,7 @@
 
 BibleEngine API is the next-generation backend powering the Goshen Bible Engine at `https://engine.bible` and `https://bible.world`.
 
-Built with **Python**, **FastAPI**, and **PostgreSQL**, it provides a high-performance, scalable RESTful API for Bible verse search, multi-translation access, wiki integration, and user interaction features (e.g., verse likes).
+Built with **Python**, **FastAPI**, and **MariaDB/MySQL**, it provides a high-performance, scalable RESTful API for Bible verse search, multi-translation access, wiki integration, and user interaction features (e.g., verse likes).
 
 This project is fully decoupled from the legacy PHP implementation and the bible.world MediaWiki frontend, enabling independent development and deployment.
 
@@ -16,7 +16,7 @@ This project is fully decoupled from the legacy PHP implementation and the bible
 - **Wiki Integration**: Fetch rich contextual content (commentaries, encyclopedia entries) from bible.world MediaWiki.
 - **Like Functionality**: Increment and retrieve "likes" for verses.
 - **Versioned Endpoints**: `/v1/api/...` for future-proofing and backward compatibility.
-- **Scalable & Modern**: Async FastAPI backend with PostgreSQL for reliability and performance.
+- **Scalable & Modern**: Async FastAPI backend with MariaDB/MySQL for reliability and performance.
 
 ## API Endpoints (v1)
 
@@ -32,7 +32,7 @@ This guide covers the complete setup for the BibleEngine API backend on a fresh 
 
 #### 1. System Update and Basic Tools
 `sudo apt update && sudo apt upgrade -y`
-`sudo apt install -y python3 python3-venv python3-pip git curl postgresql postgresql-contrib ufw`
+`sudo apt install -y python3 python3-venv python3-pip git curl mariadb-server mariadb-client ufw`
 
 #### 2. Create Project Directory and Clone Repository
 `mkdir -p /home/mhuo/bibleengine-api`
@@ -43,19 +43,24 @@ This guide covers the complete setup for the BibleEngine API backend on a fresh 
 `python3 -m venv venv`
 `source venv/bin/activate`
 `pip install --upgrade pip`
-`pip install fastapi uvicorn psycopg2-binary python-dotenv`
+`pip install -r requirements.txt`
 
-#### 4. Configure PostgreSQL
-`sudo -u postgres psql`
+#### 4. Configure MariaDB
+`sudo systemctl start mariadb`
+`sudo systemctl enable mariadb`
+`sudo mysql_secure_installation`
 
-In psql:
-`CREATE DATABASE bible;`
-`CREATE USER bible WITH PASSWORD 'your_strong_password';`
-`ALTER ROLE bible SET client_encoding TO 'utf8';`
-`ALTER ROLE bible SET default_transaction_isolation TO 'read committed';`
-`ALTER ROLE bible SET timezone TO 'UTC';`
-`GRANT ALL PRIVILEGES ON DATABASE bible TO bible;`
-`\q`
+Then create database and user:
+`sudo mysql -u root -p`
+
+In MySQL:
+```sql
+CREATE DATABASE bible CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE USER 'bible'@'localhost' IDENTIFIED BY 'your_strong_password';
+GRANT ALL PRIVILEGES ON bible.* TO 'bible'@'localhost';
+FLUSH PRIVILEGES;
+EXIT;
+```
 
 #### 5. Create Environment File
 Create a `.env` file in the project root:
@@ -64,7 +69,7 @@ Create a `.env` file in the project root:
 Example `.env` content:
 ```
 ENVIRONMENT=production
-DATABASE_URL=postgresql://bible:your_strong_password@localhost/bible
+DATABASE_URL=mysql://bible:your_strong_password@localhost:3306/bible
 SECRET_KEY=your_random_secret_key_here
 WIKI_BASE_URL=https://bible.world
 ```
@@ -114,6 +119,15 @@ Configure Apache to proxy to FastAPI and handle SSL termination (see separate Ap
 
 Your BibleEngine API backend is now ready on Ubuntu 24.04 LTS!
 
+## Documentation
+
+Comprehensive documentation is available in the [`docs/`](docs/) folder:
+
+- **[Database Schema](docs/DATABASE_SCHEMA.md)** - Complete database schema documentation
+- **[API Reference](docs/API_REFERENCE.md)** - API endpoint documentation
+- **[Deployment Guide](docs/DEPLOYMENT.md)** - Production deployment instructions
+- **[Environment Configuration](docs/ENVIRONMENTS.md)** - Dev and production environment setup
+
 ## License
 
 See [LICENSE](LICENSE) for details.
@@ -136,4 +150,4 @@ For authorization or support: `https://github.com/viaifoundation/bibleengine-api
 
 - The Lockman Foundation for NASB permission
 - bible.world MediaWiki community for content integration
-- FastAPI, PostgreSQL, and Python communities
+- FastAPI, MariaDB, and Python communities

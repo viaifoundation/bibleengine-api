@@ -68,21 +68,21 @@ The current implementation assumes all translations are in the same `bible_books
 ### Full-Text Search
 
 For optimal keyword search performance, consider:
-- PostgreSQL full-text search indexes (`tsvector`, `gin` indexes)
+- MySQL/MariaDB full-text search indexes (`FULLTEXT` indexes)
 - Or use a dedicated search engine like Elasticsearch for large-scale deployments
 
 ## Differences from PHP Implementation
 
 1. **Async/Await**: Uses Python async/await for better concurrency
 2. **Type Safety**: Pydantic models provide request/response validation
-3. **Database**: PostgreSQL instead of MySQL (asyncpg instead of mysqli)
+3. **Database**: MariaDB/MySQL with async driver (aiomysql instead of mysqli)
 4. **API Structure**: RESTful endpoints with versioning (`/v1/api/...`)
 5. **Error Handling**: Structured error responses with HTTP status codes
 
 ## Configuration
 
 All configuration is done via environment variables (see `.env` file):
-- `DATABASE_URL`: PostgreSQL connection string
+- `DATABASE_URL`: MariaDB/MySQL connection string (format: `mysql://user:pass@host:port/db`)
 - `SECRET_KEY`: Application secret key
 - `WIKI_BASE_URL`: Base URL for MediaWiki API
 - `ENVIRONMENT`: Environment name (development/production)
@@ -100,7 +100,7 @@ To test the API locally:
 
 ## Next Steps
 
-1. **Database Migration**: Set up PostgreSQL database and migrate data from MySQL
+1. **Database Setup**: Set up MariaDB/MySQL database (already using MariaDB)
 2. **Testing**: Add unit tests and integration tests
 3. **Caching**: Consider adding Redis for caching frequent queries
 4. **Rate Limiting**: Add rate limiting to prevent abuse

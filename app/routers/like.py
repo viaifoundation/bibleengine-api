@@ -14,16 +14,29 @@ async def like_verse(request: LikeRequest):
     - POST /v1/api/like with body: {"book": 43, "chapter": 3, "verse": 16}
     """
     try:
-        # Update likes count
-        query = """
+        # Update likes count (MySQL doesn't support RETURNING, so we do it in two steps)
+        update_query = """
             UPDATE bible_books
             SET likes = likes + 1
-            WHERE book = $1 AND chapter = $2 AND verse = $3
-            RETURNING likes
+            WHERE book = %s AND chapter = %s AND verse = %s
+        """
+        
+        await db.execute(
+            update_query,
+            request.book,
+            request.chapter,
+            request.verse
+        )
+        
+        # Get updated likes count
+        select_query = """
+            SELECT likes
+            FROM bible_books
+            WHERE book = %s AND chapter = %s AND verse = %s
         """
         
         result = await db.fetch_one(
-            query,
+            select_query,
             request.book,
             request.chapter,
             request.verse

@@ -18,16 +18,18 @@ async def lifespan(app: FastAPI):
 
 # Create FastAPI app
 app = FastAPI(
-    title="BibleEngine API",
+    title=settings.api_title,
     description="Next-generation backend API for Bible verse search, multi-translation access, wiki integration, and user interaction features.",
-    version="1.0.0",
-    lifespan=lifespan
+    version=settings.api_version,
+    lifespan=lifespan,
+    docs_url="/docs" if settings.is_development else None,  # Disable docs in production
+    redoc_url="/redoc" if settings.is_development else None,  # Disable redoc in production
 )
 
 # CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # In production, specify allowed origins
+    allow_origins=settings.allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

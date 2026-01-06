@@ -1,24 +1,22 @@
 """Database connection and session management."""
-import asyncpg
-from typing import Optional
+import aiomysql
+from typing import Optional, Dict, Any, List
 from app.config import settings
 
 
 class Database:
-    """Database connection manager."""
+    """Database connection manager for MariaDB/MySQL."""
     
     def __init__(self):
-        self.pool: Optional[asyncpg.Pool] = None
+        self.pool: Optional[aiomysql.Pool] = None
     
     async def connect(self):
         """Create database connection pool."""
-        # Parse PostgreSQL URL
-        # Format: postgresql://user:password@host:port/database
+        # Parse MySQL/MariaDB URL
+        # Format: mysql://user:password@host:port/database
         from urllib.parse import urlparse, unquote
         
         try:
-            # Try to use the connection string directly first
-            # asyncpg supports postgresql:// URLs, but we need to handle encoding
             parsed = urlparse(settings.database_url)
             
             if parsed.scheme and parsed.hostname:
@@ -26,17 +24,19 @@ class Database:
                 user = unquote(parsed.username) if parsed.username else None
                 password = unquote(parsed.password) if parsed.password else None
                 host = parsed.hostname
-                port = parsed.port if parsed.port else 5432
+                port = parsed.port if parsed.port else 3306
                 database = unquote(parsed.path.lstrip('/')) if parsed.path else None
                 
-                self.pool = await asyncpg.create_pool(
+                self.pool = await aiomysql.create_pool(
                     host=host,
                     port=port,
                     user=user,
                     password=password,
-                    database=database,
-                    min_size=1,
-                    max_size=10,
+                    db=database,
+                    minsize=1,
+                    maxsize=10,
+                    charset='utf8mb4',
+                    autocommit=True
                 )
             else:
                 raise ValueError("Invalid DATABASE_URL format")
@@ -46,22 +46,30 @@ class Database:
     async def disconnect(self):
         """Close database connection pool."""
         if self.pool:
-            await self.pool.close()
+            self.pool.close()
+            await self.pool.wait_closed()
     
-    async def fetch_one(self, query: str, *args):
-        """Execute a query and return one row."""
+    async def fetch_one(self, query: str, *args) -> Optional[Dict[str, Any]]:
+        """Execute a query and return one row as a dictionary."""
         async with self.pool.acquire() as conn:
-            return await conn.fetchrow(query, *args)
+            async with conn.cursor(aiomysql.DictCursor) as cursor:
+                await cursor.execute(query, args)
+                return await cursor.fetchone()
     
-    async def fetch_all(self, query: str, *args):
-        """Execute a query and return all rows."""
+    async def fetch_all(self, query: str, *args) -> List[Dict[str, Any]]:
+        """Execute a query and return all rows as a list of dictionaries."""
         async with self.pool.acquire() as conn:
-            return await conn.fetch(query, *args)
+            async with conn.cursor(aiomysql.DictCursor) as cursor:
+                await cursor.execute(query, args)
+                return await cursor.fetchall()
     
-    async def execute(self, query: str, *args):
-        """Execute a query (INSERT, UPDATE, DELETE)."""
+    async def execute(self, query: str, *args) -> int:
+        """Execute a query (INSERT, UPDATE, DELETE) and return affected rows."""
         async with self.pool.acquire() as conn:
-            return await conn.execute(query, *args)
+            async with conn.cursor() as cursor:
+                affected = await cursor.execute(query, args)
+                await conn.commit()
+                return affected
 
 
 # Global database instance
