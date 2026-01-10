@@ -119,6 +119,101 @@ Configure Apache to proxy to FastAPI and handle SSL termination (see separate Ap
 
 Your BibleEngine API backend is now ready on Ubuntu 24.04 LTS!
 
+## Database Migration Tools
+
+The `utils/` folder contains migration tools to replicate the MySQL database to PostgreSQL or SQLite.
+
+### Prerequisites
+
+```bash
+# For PostgreSQL migration
+pip install pymysql psycopg2-binary
+
+# For SQLite migration
+pip install pymysql
+```
+
+### Migrate to PostgreSQL
+
+```bash
+# Show help
+python3 utils/migrate_to_postgresql.py --help
+
+# Basic usage with credentials
+python3 utils/migrate_to_postgresql.py \
+    --mysql-password <mysql_pwd> \
+    --pg-password <pg_pwd>
+
+# Full configuration
+python3 utils/migrate_to_postgresql.py \
+    --mysql-host localhost --mysql-user root --mysql-password secret \
+    --pg-host localhost --pg-user postgres --pg-password secret \
+    --pg-database bible
+
+# Dry run (preview without changes)
+python3 utils/migrate_to_postgresql.py --dry-run
+
+# Using environment variables
+export MYSQL_PASSWORD=secret
+export PG_PASSWORD=secret
+python3 utils/migrate_to_postgresql.py
+```
+
+**Features:**
+- Automatic PostgreSQL database creation
+- GIN indexes with tsvector for full-text search
+- Batch inserts for performance
+- Upsert support (ON CONFLICT)
+
+### Migrate to SQLite
+
+```bash
+# Show help
+python3 utils/migrate_to_sqlite.py --help
+
+# Basic usage
+python3 utils/migrate_to_sqlite.py \
+    --mysql-password <mysql_pwd> \
+    --sqlite-path /var/lib/bibleengine/bible.db
+
+# Skip FTS for faster migration
+python3 utils/migrate_to_sqlite.py --skip-fts
+
+# Dry run
+python3 utils/migrate_to_sqlite.py --dry-run
+```
+
+**Features:**
+- Single portable SQLite file
+- FTS5 full-text search with auto-sync triggers
+- WAL mode for concurrent access
+- VACUUM and ANALYZE optimization
+
+### Common Options
+
+| Option | Description |
+|--------|-------------|
+| `--dry-run` | Preview migration without changes |
+| `--batch-size N` | Batch size for inserts (default: 1000) |
+| `--skip-translations` | Skip translation tables |
+| `--tables TABLE...` | Migrate specific tables only |
+
+### Environment Variables
+
+| Variable | Description |
+|----------|-------------|
+| `MYSQL_HOST` | MySQL hostname |
+| `MYSQL_PORT` | MySQL port (default: 3306) |
+| `MYSQL_USER` | MySQL username |
+| `MYSQL_PASSWORD` | MySQL password |
+| `MYSQL_DATABASE` | MySQL database (default: bible) |
+| `PG_HOST` | PostgreSQL hostname |
+| `PG_PORT` | PostgreSQL port (default: 5432) |
+| `PG_USER` | PostgreSQL username |
+| `PG_PASSWORD` | PostgreSQL password |
+| `PG_DATABASE` | PostgreSQL database (default: bible) |
+| `SQLITE_PATH` | SQLite database file path |
+
 ## Documentation
 
 Comprehensive documentation is available in the [`docs/`](docs/) folder:
